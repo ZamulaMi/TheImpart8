@@ -1,0 +1,29 @@
+{
+  "config": {
+    "thresholdSeconds": 5
+  },
+  "records": [
+    {
+      "articleId": "1792589447296",
+      "date": "2026-10-21",
+      "views": 9,
+      "durationSeconds": 911
+    },
+    {
+      "articleId": "1792591004218",
+      "date": "2026-10-21",
+      "views": 1,
+      "durationSeconds": 675
+    }
+  ],
+  "totals": {
+    "1792589447296": {
+      "views": 9,
+      "durationSeconds": 911
+    },
+    "1792591004218": {
+      "views": 1,
+      "durationSeconds": 675
+    }
+  }
+}
