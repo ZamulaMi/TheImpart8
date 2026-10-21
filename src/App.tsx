@@ -24,6 +24,7 @@ import { ArticleView } from './components/ArticleView';
 import { StaticPageView } from './components/StaticPageView';
 import { SearchModal } from './components/SearchModal';
 import { RubricsModal } from './components/RubricsModal';
+import { PopularArticlesView } from './components/PopularArticlesView';
 import { formatTimeAgoOrDate, sortArticlesChronologically } from './utils/date';
 import { getStoredTaxonomies, saveStoredTaxonomies } from './utils/taxonomies';
 import { searchArticlesWithFuzzy } from './utils/search';
@@ -81,7 +82,7 @@ const DEFAULT_SOCIAL_LINKS: SiteSocialLinks = {
   },
 };
 
-export type HeaderSection = 'news' | 'articles' | 'reviews';
+export type HeaderSection = 'popular' | 'news' | 'articles' | 'reviews';
 
 export interface NavSectionItem {
   id: HeaderSection;
@@ -90,12 +91,17 @@ export interface NavSectionItem {
 }
 
 export const NAV_SECTIONS: NavSectionItem[] = [
+  { id: 'popular', titleUa: 'Популярні', titleEn: 'Popular' },
   { id: 'news', titleUa: 'Новини', titleEn: 'News' },
   { id: 'articles', titleUa: 'Статті', titleEn: 'Articles' },
   { id: 'reviews', titleUa: 'Огляди', titleEn: 'Reviews' },
 ];
 
 export function matchesHeaderSection(article: Article, section: HeaderSection): boolean {
+  if (section === 'popular') {
+    return true;
+  }
+
   const catsUa = (
     article.categories && article.categories.length > 0
       ? article.categories
@@ -151,15 +157,27 @@ export function matchesHeaderSection(article: Article, section: HeaderSection): 
   return false;
 }
 
-interface ArticleCardProps {
+export interface ArticleCardProps {
   article: Article;
   siteLang: SiteLanguage;
   aspectRatio: '26/10.5' | '16/9' | '3/4';
   isHero?: boolean;
+  viewsOverride?: number;
+  viewsLabel?: string;
+  rankBadge?: string;
   onSelect: (id: string) => void;
 }
 
-function ArticleCard({ article, siteLang, aspectRatio, isHero = false, onSelect }: ArticleCardProps) {
+export function ArticleCard({
+  article,
+  siteLang,
+  aspectRatio,
+  isHero = false,
+  viewsOverride,
+  viewsLabel,
+  rankBadge,
+  onSelect,
+}: ArticleCardProps) {
   const isEn = siteLang === 'en';
   const rawTitle = isEn && article.titleEn ? article.titleEn : article.title;
   const title = typeof rawTitle === 'string' ? rawTitle : (rawTitle as any)?.name || String(rawTitle || '');
@@ -176,6 +194,8 @@ function ArticleCard({ article, siteLang, aspectRatio, isHero = false, onSelect 
     ? rawCategoriesList.map((c: any) => typeof c === 'string' ? c : c?.name || String(c)).join(' / ')
     : '';
   const timeAgo = formatTimeAgoOrDate(article.createdAt, article.date, article.id, siteLang);
+
+  const displayViews = typeof viewsOverride === 'number' ? viewsOverride : article.views;
 
   // Класи пропорцій для фото:
   // - 26/10.5: для головної статті першого ряду
@@ -223,6 +243,13 @@ function ArticleCard({ article, siteLang, aspectRatio, isHero = false, onSelect 
       {/* Темні градієнтні накладки для читабельності тексту */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-black/15 group-hover:from-black/90 group-hover:via-black/50 transition-all duration-300" />
 
+      {/* Бейдж рейтингу для популярних статей (#1 🔥, #2 🔥, #3 🔥) */}
+      {rankBadge && (
+        <div className="absolute top-3 left-3 z-20 flex items-center gap-1 bg-amber-500 text-black font-semibold text-[11px] px-2.5 py-1 rounded-full shadow-md tracking-wide">
+          <span>{rankBadge}</span>
+        </div>
+      )}
+
       {/* Контент поверх фото */}
       <div
         className={`relative z-10 text-white w-full ${
@@ -234,12 +261,13 @@ function ArticleCard({ article, siteLang, aspectRatio, isHero = false, onSelect 
           <span className="font-medium text-white/95">{category}</span>
           <span className="text-white/40">•</span>
           <span className="text-white/80">{timeAgo}</span>
-          {typeof article.views === 'number' && article.views > 0 && (
+          {typeof displayViews === 'number' && displayViews > 0 && (
             <>
               <span className="text-white/40">•</span>
-              <span className="inline-flex items-center gap-1 text-white/90 normal-case tracking-normal">
-                <Eye className="w-3 h-3 text-white/70" />
-                <span>{article.views.toLocaleString(siteLang === 'en' ? 'en-US' : 'uk-UA')}</span>
+              <span className="inline-flex items-center gap-1 text-white/95 normal-case tracking-normal font-medium bg-black/40 backdrop-blur-xs px-1.5 py-0.5 rounded">
+                <Eye className="w-3 h-3 text-amber-300" />
+                <span>{displayViews.toLocaleString(siteLang === 'en' ? 'en-US' : 'uk-UA')}</span>
+                {viewsLabel && <span className="text-white/80 text-[10px] lowercase">{viewsLabel}</span>}
               </span>
             </>
           )}
@@ -325,9 +353,11 @@ function parseRouteFromUrl(): {
     return { route: 'main', section: null, articleId, searchQuery: null, page: 1 };
   }
 
-  // 5. Розділи: /news, /articles, /reviews або зворотна сумісність ?section=...
+  // 5. Розділи: /popular, /news, /articles, /reviews або зворотна сумісність ?section=...
   let section: HeaderSection | null = null;
-  if (path === '/news' || params.get('section') === 'news') {
+  if (path === '/popular' || params.get('section') === 'popular') {
+    section = 'popular';
+  } else if (path === '/news' || params.get('section') === 'news') {
     section = 'news';
   } else if (path === '/articles' || params.get('section') === 'articles') {
     section = 'articles';
@@ -1749,6 +1779,16 @@ const sanitizeStaticPages = (data: SitePagesData): SitePagesData => ({
                 );
               })()}
             </div>
+          ) : activeCategorySection === 'popular' ? (
+            <PopularArticlesView
+              articles={basePublishedArticles}
+              siteLang={siteLang}
+              taxonomies={taxonomies}
+              onSelectArticle={handleSelectArticle}
+              onSelectCategory={handleSelectCategoryFromArticle}
+              onSelectTopic={handleSelectTopicFromArticle}
+              onBackToMain={() => handleSelectSection(null)}
+            />
           ) : activeCategorySection ? (
             /* Сторінка обраної рубрики (Новини / Статті / Огляди) */
             <div
