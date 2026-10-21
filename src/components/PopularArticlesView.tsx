@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Flame,
   TrendingUp,
   Clock,
   Calendar,
@@ -255,11 +254,10 @@ export const PopularArticlesView: React.FC<PopularArticlesViewProps> = ({
         <div className="flex items-baseline justify-between border-b border-neutral-100 dark:border-[#333333] pb-3">
           <div className="flex items-baseline gap-3">
             <h1
-              className="text-2xl sm:text-3xl font-medium tracking-tight text-black dark:text-[#ffffff] flex items-center gap-2"
+              className="text-2xl sm:text-3xl font-medium tracking-tight text-black dark:text-[#ffffff]"
               style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
             >
-              <span>{isEn ? 'Popular' : 'Популярні'}</span>
-              <span className="text-amber-500 font-sans text-xl">🔥</span>
+              {isEn ? 'Popular' : 'Популярні'}
             </h1>
             <span className="text-xs text-neutral-400 dark:text-[#777777] font-light tracking-wide">
               {sortedArticles.length}{' '}
@@ -425,10 +423,8 @@ export const PopularArticlesView: React.FC<PopularArticlesViewProps> = ({
             {/* Ряд 1: 2 горизонтальні картки (16:9) */}
             {row1.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                {row1.map((article, idx) => {
+                {row1.map((article) => {
                   const itemViews = period === 'all' ? (article.views ?? 0) : (periodStats[article.id] ?? 0);
-                  const rankNumber = startIndex + idx + 1;
-                  const rankBadge = rankNumber <= 3 ? `#${rankNumber} 🔥` : undefined;
 
                   return (
                     <ArticleCard
@@ -438,7 +434,6 @@ export const PopularArticlesView: React.FC<PopularArticlesViewProps> = ({
                       aspectRatio="16/9"
                       viewsOverride={itemViews}
                       viewsLabel={getPeriodViewsLabel()}
-                      rankBadge={rankBadge}
                       onSelect={onSelectArticle}
                     />
                   );
@@ -449,10 +444,8 @@ export const PopularArticlesView: React.FC<PopularArticlesViewProps> = ({
             {/* Ряд 2: 3 вертикальні картки (3:4) */}
             {row2.length > 0 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
-                {row2.map((article, idx) => {
+                {row2.map((article) => {
                   const itemViews = period === 'all' ? (article.views ?? 0) : (periodStats[article.id] ?? 0);
-                  const rankNumber = startIndex + 2 + idx + 1;
-                  const rankBadge = rankNumber <= 3 ? `#${rankNumber} 🔥` : undefined;
 
                   return (
                     <ArticleCard
@@ -462,7 +455,6 @@ export const PopularArticlesView: React.FC<PopularArticlesViewProps> = ({
                       aspectRatio="3/4"
                       viewsOverride={itemViews}
                       viewsLabel={getPeriodViewsLabel()}
-                      rankBadge={rankBadge}
                       onSelect={onSelectArticle}
                     />
                   );

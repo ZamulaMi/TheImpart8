@@ -164,7 +164,6 @@ export interface ArticleCardProps {
   isHero?: boolean;
   viewsOverride?: number;
   viewsLabel?: string;
-  rankBadge?: string;
   onSelect: (id: string) => void;
 }
 
@@ -175,7 +174,6 @@ export function ArticleCard({
   isHero = false,
   viewsOverride,
   viewsLabel,
-  rankBadge,
   onSelect,
 }: ArticleCardProps) {
   const isEn = siteLang === 'en';
@@ -242,13 +240,6 @@ export function ArticleCard({
 
       {/* Темні градієнтні накладки для читабельності тексту */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-black/15 group-hover:from-black/90 group-hover:via-black/50 transition-all duration-300" />
-
-      {/* Бейдж рейтингу для популярних статей (#1 🔥, #2 🔥, #3 🔥) */}
-      {rankBadge && (
-        <div className="absolute top-3 left-3 z-20 flex items-center gap-1 bg-amber-500 text-black font-semibold text-[11px] px-2.5 py-1 rounded-full shadow-md tracking-wide">
-          <span>{rankBadge}</span>
-        </div>
-      )}
 
       {/* Контент поверх фото */}
       <div
