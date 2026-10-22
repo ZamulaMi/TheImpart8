@@ -12,14 +12,24 @@ export async function fetchStatsConfig(): Promise<StatsConfig> {
     });
     if (res.ok) {
       const data = await res.json();
-      if (data && typeof data.thresholdSeconds === 'number') {
+      if (data && typeof data.thresholdSeconds === 'number' && data.thresholdSeconds > 0) {
+        try {
+          localStorage.setItem('the_impart_stats_threshold', String(data.thresholdSeconds));
+        } catch {}
         return data as StatsConfig;
       }
     }
   } catch (err) {
     console.warn('fetchStatsConfig notice:', err);
   }
-  return { thresholdSeconds: 10 };
+  try {
+    const cached = localStorage.getItem('the_impart_stats_threshold');
+    if (cached) {
+      const val = parseInt(cached, 10);
+      if (val > 0) return { thresholdSeconds: val };
+    }
+  } catch {}
+  return { thresholdSeconds: 5 };
 }
 
 /**
@@ -40,6 +50,9 @@ export async function saveStatsConfig(thresholdSeconds: number): Promise<boolean
       }),
     });
     if (res.ok) {
+      try {
+        localStorage.setItem('the_impart_stats_threshold', String(thresholdSeconds));
+      } catch {}
       return true;
     }
   } catch (err) {

@@ -55,8 +55,24 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
     };
   }, [article.id]);
 
-  // Надійна фіксація перегляду та відстеження тривалості читання
+  // Динамічне завантаження порогу зарахування перегляду з адмін-панелі та фіксація читання
   useEffect(() => {
+    let thresholdSec = 5;
+    try {
+      const cached = localStorage.getItem('the_impart_stats_threshold');
+      if (cached) {
+        const val = parseInt(cached, 10);
+        if (val > 0) thresholdSec = val;
+      }
+    } catch {}
+
+    let isMounted = true;
+    fetchStatsConfig().then((cfg) => {
+      if (isMounted && cfg && typeof cfg.thresholdSeconds === 'number' && cfg.thresholdSeconds > 0) {
+        thresholdSec = cfg.thresholdSeconds;
+      }
+    });
+
     const sessionKey = `impart_viewed_${article.id}`;
     let isViewedInSession = false;
     try {
@@ -77,41 +93,35 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
     })();
 
     let activeSeconds = 0;
+    let viewRecorded = isViewedInSession;
     let lastFlushSeconds = 0;
-    let isMounted = true;
 
-    // 1. Якщо цей користувач ще не переглядав статтю у поточній сесії вкладки —
-    // зараховуємо перегляд гарантовано через 1.5 секунди перебування на матеріалі
-    let viewTimer: any = null;
-    if (!isViewedInSession) {
-      viewTimer = setTimeout(() => {
-        if (!isMounted) return;
-        trackArticleView({
-          articleId: article.id,
-          durationSeconds: 2,
-          qualifyView: true,
-          sessionId,
-        }).then((res) => {
-          if (isMounted) {
-            try {
-              sessionStorage.setItem(sessionKey, String(Date.now()));
-            } catch {}
-            if (res && typeof res.views === 'number') {
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        activeSeconds += 1;
+
+        // Коли активний час читача досягає порогу з адмін-панелі — фіксуємо перегляд
+        if (!viewRecorded && activeSeconds >= thresholdSec) {
+          viewRecorded = true;
+          try {
+            sessionStorage.setItem(sessionKey, String(Date.now()));
+          } catch {}
+
+          trackArticleView({
+            articleId: article.id,
+            durationSeconds: activeSeconds - lastFlushSeconds,
+            qualifyView: true,
+            sessionId,
+          }).then((res) => {
+            if (isMounted && res && typeof res.views === 'number') {
               setViews(res.views);
               onViewsUpdated?.(article.id, res.views);
             }
-          }
-        });
-        lastFlushSeconds = 2;
-      }, 1500);
-    }
-
-    // 2. Періодичний таймер для накопичення точної тривалості читання
-    const intervalTimer = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        activeSeconds += 1;
-        const delta = activeSeconds - lastFlushSeconds;
-        if (delta >= 15) {
+          });
+          lastFlushSeconds = activeSeconds;
+        } else if (viewRecorded && activeSeconds - lastFlushSeconds >= 10) {
+          // Періодичне оновлення часу читання для точної статистики тривалості
+          const delta = activeSeconds - lastFlushSeconds;
           lastFlushSeconds = activeSeconds;
           trackArticleView({
             articleId: article.id,
@@ -126,10 +136,11 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
     const handleBeforeUnload = () => {
       const delta = activeSeconds - lastFlushSeconds;
       if (delta > 0) {
+        const qualify = !viewRecorded && activeSeconds >= thresholdSec;
         trackArticleView({
           articleId: article.id,
           durationSeconds: delta,
-          qualifyView: false,
+          qualifyView: qualify,
           sessionId,
         });
       }
@@ -139,8 +150,7 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
 
     return () => {
       isMounted = false;
-      if (viewTimer) clearTimeout(viewTimer);
-      clearInterval(intervalTimer);
+      clearInterval(timer);
       window.removeEventListener('beforeunload', handleBeforeUnload);
       handleBeforeUnload();
     };

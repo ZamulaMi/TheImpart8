@@ -65,7 +65,7 @@ export interface StatsSummaryResponse {
 }
 
 const DEFAULT_CONFIG: StatsConfig = {
-  thresholdSeconds: 10,
+  thresholdSeconds: 5,
 };
 
 const DATA_DIR = path.resolve(process.cwd(), 'data');

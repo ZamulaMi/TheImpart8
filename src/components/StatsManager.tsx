@@ -54,8 +54,26 @@ export const StatsManager: React.FC<StatsManagerProps> = ({
   const [chartMetric, setChartMetric] = useState<'views' | 'time'>('views');
 
   // Поріг часу зарахування перегляду
-  const [thresholdSeconds, setThresholdSeconds] = useState<number>(10);
-  const [thresholdInput, setThresholdInput] = useState<string>('10');
+  const [thresholdSeconds, setThresholdSeconds] = useState<number>(() => {
+    try {
+      const cached = localStorage.getItem('the_impart_stats_threshold');
+      if (cached) {
+        const val = parseInt(cached, 10);
+        if (val > 0) return val;
+      }
+    } catch {}
+    return 5;
+  });
+  const [thresholdInput, setThresholdInput] = useState<string>(() => {
+    try {
+      const cached = localStorage.getItem('the_impart_stats_threshold');
+      if (cached) {
+        const val = parseInt(cached, 10);
+        if (val > 0) return String(val);
+      }
+    } catch {}
+    return '5';
+  });
   const [isSavingThreshold, setIsSavingThreshold] = useState<boolean>(false);
   const [thresholdNotice, setThresholdNotice] = useState<string | null>(null);
 
@@ -64,7 +82,7 @@ export const StatsManager: React.FC<StatsManagerProps> = ({
   const [summaryData, setSummaryData] = useState<StatsSummaryResponse | null>(null);
   const [refreshIndex, setRefreshIndex] = useState<number>(0);
 
-  // Завантаження початкового порогу часу
+  // Завантаження початкового порогу часу з сервера
   useEffect(() => {
     fetchStatsConfig().then((cfg) => {
       if (cfg && cfg.thresholdSeconds > 0) {
@@ -273,7 +291,7 @@ export const StatsManager: React.FC<StatsManagerProps> = ({
         {/* Швидкі пресети */}
         <div className="flex items-center flex-wrap gap-2 pt-2 border-t border-neutral-100 text-xs">
           <span className="text-neutral-400">Швидкий вибір:</span>
-          {[5, 10, 15, 30, 45, 60].map((sec) => (
+          {[3, 5, 10, 15, 30, 45, 60].map((sec) => (
             <button
               key={sec}
               type="button"
@@ -287,7 +305,7 @@ export const StatsManager: React.FC<StatsManagerProps> = ({
                   : 'bg-white text-neutral-600 border-neutral-200 hover:border-neutral-400'
               }`}
             >
-              {sec} сек {sec === 10 ? '(за замовчуванням)' : ''}
+              {sec} сек {sec === 5 ? '(поточний)' : ''}
             </button>
           ))}
           {thresholdNotice && (
