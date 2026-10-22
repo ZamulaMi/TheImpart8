@@ -156,10 +156,13 @@ if (!initialStatsFromFile) {
 const sessionViewCache = new Set<string>();
 
 let isStatsDbInitialized = false;
+let lastStatsDbLoadedAt = 0;
 let statsLoadPromise: Promise<void> | null = null;
+const STATS_CACHE_TTL_MS = 15000; // 15 секунд кешування для високої швидкодії та актуальності
 
 export async function ensureStatsLoaded(forceRefresh = false): Promise<void> {
-  if (isStatsDbInitialized && !forceRefresh) return;
+  const isFresh = isStatsDbInitialized && Date.now() - lastStatsDbLoadedAt < STATS_CACHE_TTL_MS;
+  if (isFresh && !forceRefresh) return;
   if (statsLoadPromise && !forceRefresh) return statsLoadPromise;
 
   statsLoadPromise = (async () => {
@@ -258,6 +261,7 @@ export async function ensureStatsLoaded(forceRefresh = false): Promise<void> {
         writeStatsToFile(inMemoryStats);
       }, 6000);
       isStatsDbInitialized = true;
+      lastStatsDbLoadedAt = Date.now();
     } catch (err) {
       console.warn('Neon stats DB load notice (fallback active):', err);
     } finally {
@@ -300,14 +304,24 @@ export async function saveStatsConfig(thresholdSeconds: number): Promise<StatsCo
 
 export function getArticleViewsMap(): Record<string, number> {
   const map: Record<string, number> = {};
+  for (const r of inMemoryStats.records) {
+    map[r.articleId] = (map[r.articleId] || 0) + (Number(r.views) || 0);
+  }
   for (const [id, tot] of Object.entries(inMemoryStats.totals)) {
-    map[id] = tot.views || 0;
+    map[id] = Math.max(map[id] || 0, tot.views || 0);
   }
   return map;
 }
 
 export function getTotalViews(articleId: string): number {
-  return inMemoryStats.totals[articleId]?.views || 0;
+  const totViews = inMemoryStats.totals[articleId]?.views || 0;
+  let recordsSum = 0;
+  for (const r of inMemoryStats.records) {
+    if (r.articleId === articleId) {
+      recordsSum += Number(r.views) || 0;
+    }
+  }
+  return Math.max(totViews, recordsSum);
 }
 
 export async function recordVisit(payload: {
@@ -399,8 +413,8 @@ export async function recordVisit(payload: {
   }
 
   return {
-    views: inMemoryStats.totals[articleId].views,
-    totalDurationSeconds: inMemoryStats.totals[articleId].durationSeconds,
+    views: getTotalViews(articleId),
+    totalDurationSeconds: inMemoryStats.totals[articleId]?.durationSeconds || 0,
   };
 }
 
@@ -736,6 +750,7 @@ export default async function handler(req: any, res: any) {
 
       // 2. Отримання мапи загальних переглядів усіх статей
       if (actionParam === 'totals' || url.includes('/totals')) {
+        await ensureStatsLoaded();
         const totals = getArticleViewsMap();
         return res.status(200).json(totals);
       }
@@ -746,11 +761,13 @@ export default async function handler(req: any, res: any) {
         if (!artId) {
           return res.status(400).json({ error: 'Параметр id статті обов\'язковий' });
         }
-        const tot = inMemoryStats.totals[artId] || { views: 0, durationSeconds: 0 };
+        await ensureStatsLoaded();
+        const views = getTotalViews(artId);
+        const duration = inMemoryStats.totals[artId]?.durationSeconds || 0;
         return res.status(200).json({
           articleId: artId,
-          views: tot.views,
-          durationSeconds: tot.durationSeconds,
+          views,
+          durationSeconds: duration,
         });
       }
 

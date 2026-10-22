@@ -862,13 +862,15 @@ const sanitizeStaticPages = (data: SitePagesData): SitePagesData => ({
         setArticles((prev) => {
           let hasDiff = false;
           const next = prev.map((art) => {
-            const v = typeof viewsMap[art.id] === 'number' ? viewsMap[art.id] : (art.views ?? 0);
-            if (v !== art.views) {
+            const serverV = typeof viewsMap[art.id] === 'number' ? viewsMap[art.id] : 0;
+            const currentV = art.views ?? 0;
+            const finalV = Math.max(serverV, currentV);
+            if (finalV !== currentV) {
               hasDiff = true;
             }
             return {
               ...art,
-              views: v,
+              views: finalV,
             };
           });
           if (hasDiff) {
@@ -887,9 +889,12 @@ const sanitizeStaticPages = (data: SitePagesData): SitePagesData => ({
     setArticles((prev) => {
       let changed = false;
       const next = prev.map((art) => {
-        if (art.id === articleId && (art.views ?? 0) < updatedViews) {
-          changed = true;
-          return { ...art, views: updatedViews };
+        if (art.id === articleId) {
+          const maxV = Math.max(art.views ?? 0, updatedViews);
+          if (maxV !== (art.views ?? 0)) {
+            changed = true;
+            return { ...art, views: maxV };
+          }
         }
         return art;
       });
@@ -1150,7 +1155,7 @@ const sanitizeStaticPages = (data: SitePagesData): SitePagesData => ({
       setArticles((prev) => {
         const exists = prev.some((a) => a.id === savedArticle.id);
         const updated = exists
-          ? prev.map((a) => (a.id === savedArticle.id ? savedArticle : a))
+          ? prev.map((a) => (a.id === savedArticle.id ? { ...savedArticle, views: Math.max(a.views ?? 0, savedArticle.views ?? 0) } : a))
           : [savedArticle, ...prev];
         const sorted = sortArticlesChronologically(updated);
         try {

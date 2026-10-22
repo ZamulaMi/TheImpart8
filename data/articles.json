@@ -1,5 +1,27 @@
 [
   {
+    "id": "1792602023813",
+    "title": "Тестова стаття 20:00",
+    "excerpt": "",
+    "content": "",
+    "category": "Есе",
+    "categories": [
+      "Есе"
+    ],
+    "topics": [],
+    "author": "Редакція The Impart",
+    "date": "21 жовтня 2026 р.",
+    "createdAt": "2026-10-21T17:00:37.705Z",
+    "published": true,
+    "categoryEn": "Essay",
+    "categoriesEn": [
+      "Essay"
+    ],
+    "topicsEn": [],
+    "publishedEn": false,
+    "views": 3
+  },
+  {
     "id": "1792589447296",
     "title": "Тестова стаття 17:15",
     "excerpt": "Короткий опис",
@@ -24,6 +46,7 @@
     "topicsEn": [
       "Mindfulness"
     ],
-    "publishedEn": false
+    "publishedEn": false,
+    "views": 16
   }
 ]

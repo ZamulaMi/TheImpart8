@@ -55,48 +55,63 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
     };
   }, [article.id]);
 
-  // Відстеження часу читання та фіксація перегляду після проходження порогу (10 секунд або з налаштувань)
+  // Надійна фіксація перегляду та відстеження тривалості читання
   useEffect(() => {
-    let thresholdSec = 10;
-    fetchStatsConfig().then((cfg) => {
-      if (cfg && cfg.thresholdSeconds > 0) {
-        thresholdSec = cfg.thresholdSeconds;
+    const sessionKey = `impart_viewed_${article.id}`;
+    let isViewedInSession = false;
+    try {
+      isViewedInSession = Boolean(sessionStorage.getItem(sessionKey));
+    } catch {}
+
+    const sessionId = (() => {
+      try {
+        let sid = sessionStorage.getItem('impart_session_id');
+        if (!sid) {
+          sid = `s_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+          sessionStorage.setItem('impart_session_id', sid);
+        }
+        return sid;
+      } catch {
+        return `s_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
       }
-    });
+    })();
 
-    const sessionId = `s_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     let activeSeconds = 0;
-    let viewRecorded = false;
     let lastFlushSeconds = 0;
+    let isMounted = true;
 
-    const timer = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        activeSeconds += 1;
-
-        // Якщо досягнуто порогового часу перебування — зараховуємо перегляд
-        if (activeSeconds >= thresholdSec && !viewRecorded) {
-          viewRecorded = true;
-          trackArticleView({
-            articleId: article.id,
-            durationSeconds: activeSeconds - lastFlushSeconds,
-            qualifyView: true,
-            sessionId,
-          }).then((res) => {
+    // 1. Якщо цей користувач ще не переглядав статтю у поточній сесії вкладки —
+    // зараховуємо перегляд гарантовано через 1.5 секунди перебування на матеріалі
+    let viewTimer: any = null;
+    if (!isViewedInSession) {
+      viewTimer = setTimeout(() => {
+        if (!isMounted) return;
+        trackArticleView({
+          articleId: article.id,
+          durationSeconds: 2,
+          qualifyView: true,
+          sessionId,
+        }).then((res) => {
+          if (isMounted) {
+            try {
+              sessionStorage.setItem(sessionKey, String(Date.now()));
+            } catch {}
             if (res && typeof res.views === 'number') {
               setViews(res.views);
               onViewsUpdated?.(article.id, res.views);
-            } else {
-              setViews((v) => {
-                const next = v + 1;
-                onViewsUpdated?.(article.id, next);
-                return next;
-              });
             }
-          });
-          lastFlushSeconds = activeSeconds;
-        } else if (viewRecorded && activeSeconds - lastFlushSeconds >= 10) {
-          // Періодичне оновлення часу перебування для точної статистики часу
-          const delta = activeSeconds - lastFlushSeconds;
+          }
+        });
+        lastFlushSeconds = 2;
+      }, 1500);
+    }
+
+    // 2. Періодичний таймер для накопичення точної тривалості читання
+    const intervalTimer = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        activeSeconds += 1;
+        const delta = activeSeconds - lastFlushSeconds;
+        if (delta >= 15) {
           lastFlushSeconds = activeSeconds;
           trackArticleView({
             articleId: article.id,
@@ -114,7 +129,7 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
         trackArticleView({
           articleId: article.id,
           durationSeconds: delta,
-          qualifyView: !viewRecorded && activeSeconds >= thresholdSec,
+          qualifyView: false,
           sessionId,
         });
       }
@@ -123,7 +138,9 @@ export const ArticleView: React.FC<ArticleViewProps> = ({
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
-      clearInterval(timer);
+      isMounted = false;
+      if (viewTimer) clearTimeout(viewTimer);
+      clearInterval(intervalTimer);
       window.removeEventListener('beforeunload', handleBeforeUnload);
       handleBeforeUnload();
     };

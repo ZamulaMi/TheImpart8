@@ -54,12 +54,8 @@ export const PopularArticlesView: React.FC<PopularArticlesViewProps> = ({
     setPage(1);
   }, [period, selectedCategory, selectedTopic]);
 
-  // Завантажуємо показники за період, коли обрано конкретний проміжок часу
+  // Завантажуємо показники за період, коли обрано будь-який проміжок часу (включаючи 'all')
   useEffect(() => {
-    if (period === 'all') {
-      return;
-    }
-
     let isMounted = true;
     setIsLoadingStats(true);
 
@@ -68,7 +64,7 @@ export const PopularArticlesView: React.FC<PopularArticlesViewProps> = ({
         if (res && Array.isArray(res.articles)) {
           const map: Record<string, number> = {};
           for (const item of res.articles) {
-            map[item.id] = item.viewsInPeriod || 0;
+            map[item.id] = period === 'all' ? (item.totalViews || item.viewsInPeriod || 0) : (item.viewsInPeriod || 0);
           }
           setPeriodStats(map);
         }
@@ -128,6 +124,14 @@ export const PopularArticlesView: React.FC<PopularArticlesViewProps> = ({
     return Array.from(set).sort();
   }, [articles, taxonomies.topics, isEn]);
 
+  // Отримання точної кількості переглядів статті за вибраний період
+  const getArticleViews = (art: Article): number => {
+    if (typeof periodStats[art.id] === 'number') {
+      return periodStats[art.id];
+    }
+    return art.views ?? 0;
+  };
+
   // Фільтрація статей
   const filteredArticles = useMemo(() => {
     return articles.filter((art) => {
@@ -138,7 +142,7 @@ export const PopularArticlesView: React.FC<PopularArticlesViewProps> = ({
       if (isHidden) return false;
 
       // 2. Якщо обрано конкретний проміжок часу — показуємо лише статті, які читалися у цей період
-      const viewsCount = period === 'all' ? (art.views ?? 0) : (periodStats[art.id] ?? 0);
+      const viewsCount = getArticleViews(art);
       if (period !== 'all' && viewsCount <= 0) {
         return false;
       }
@@ -185,8 +189,8 @@ export const PopularArticlesView: React.FC<PopularArticlesViewProps> = ({
   const sortedArticles = useMemo(() => {
     const list = [...filteredArticles];
     list.sort((a, b) => {
-      const viewsA = period === 'all' ? (a.views ?? 0) : (periodStats[a.id] ?? 0);
-      const viewsB = period === 'all' ? (b.views ?? 0) : (periodStats[b.id] ?? 0);
+      const viewsA = getArticleViews(a);
+      const viewsB = getArticleViews(b);
 
       if (viewsB !== viewsA) {
         return viewsB - viewsA; // Більше переглядів зверху!
@@ -424,7 +428,7 @@ export const PopularArticlesView: React.FC<PopularArticlesViewProps> = ({
             {row1.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 {row1.map((article) => {
-                  const itemViews = period === 'all' ? (article.views ?? 0) : (periodStats[article.id] ?? 0);
+                  const itemViews = getArticleViews(article);
 
                   return (
                     <ArticleCard
@@ -445,7 +449,7 @@ export const PopularArticlesView: React.FC<PopularArticlesViewProps> = ({
             {row2.length > 0 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
                 {row2.map((article) => {
-                  const itemViews = period === 'all' ? (article.views ?? 0) : (periodStats[article.id] ?? 0);
+                  const itemViews = getArticleViews(article);
 
                   return (
                     <ArticleCard
@@ -466,7 +470,7 @@ export const PopularArticlesView: React.FC<PopularArticlesViewProps> = ({
             {row3.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 {row3.map((article) => {
-                  const itemViews = period === 'all' ? (article.views ?? 0) : (periodStats[article.id] ?? 0);
+                  const itemViews = getArticleViews(article);
 
                   return (
                     <ArticleCard
@@ -487,7 +491,7 @@ export const PopularArticlesView: React.FC<PopularArticlesViewProps> = ({
             {row4.length > 0 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
                 {row4.map((article) => {
-                  const itemViews = period === 'all' ? (article.views ?? 0) : (periodStats[article.id] ?? 0);
+                  const itemViews = getArticleViews(article);
 
                   return (
                     <ArticleCard

@@ -155,31 +155,37 @@ export async function getArticles(): Promise<Article[]> {
     const rows = await safeExecuteSql(async (sql) => {
       return await sql`
         SELECT 
-          id, 
-          title, 
-          excerpt, 
-          content, 
-          category, 
-          author, 
-          cover_image as "coverImage", 
-          date, 
-          read_time as "readTime", 
-          created_at as "createdAt",
-          updated_at as "updatedAt",
-          published,
-          title_en as "titleEn",
-          excerpt_en as "excerptEn",
-          content_en as "contentEn",
-          category_en as "categoryEn",
-          published_en as "publishedEn",
-          categories,
-          categories_en as "categoriesEn",
-          topics,
-          topics_en as "topicsEn"
-        FROM articles 
-        ORDER BY created_at DESC;
+          a.id, 
+          a.title, 
+          a.excerpt, 
+          a.content, 
+          a.category, 
+          a.author, 
+          a.cover_image as "coverImage", 
+          a.date, 
+          a.read_time as "readTime", 
+          a.created_at as "createdAt",
+          a.updated_at as "updatedAt",
+          a.published,
+          a.title_en as "titleEn",
+          a.excerpt_en as "excerptEn",
+          a.content_en as "contentEn",
+          a.category_en as "categoryEn",
+          a.published_en as "publishedEn",
+          a.categories,
+          a.categories_en as "categoriesEn",
+          a.topics,
+          a.topics_en as "topicsEn",
+          COALESCE(s.total_views, 0)::int as "views"
+        FROM articles a
+        LEFT JOIN (
+          SELECT article_id, SUM(views) as total_views 
+          FROM article_stats_daily 
+          GROUP BY article_id
+        ) s ON a.id = s.article_id
+        ORDER BY a.created_at DESC;
       `;
-    }, 3000);
+    }, 4000);
 
     if (rows && rows.length > 0) {
       const mapped = rows.map((r: any) => ({
@@ -204,6 +210,7 @@ export async function getArticles(): Promise<Article[]> {
         categoriesEn: parseJsonArray(r.categoriesEn) || (r.categoryEn ? r.categoryEn.split(',').map((s: string) => s.trim()).filter(Boolean) : undefined),
         topicsEn: parseJsonArray(r.topicsEn) || [],
         publishedEn: r.publishedEn === true || String(r.publishedEn) === 'true' || r.publishedEn === 1,
+        views: Math.max(parseInt(r.views, 10) || 0, getTotalViews(String(r.id))),
       }));
 
       inMemoryArticles = mapped;
@@ -214,7 +221,16 @@ export async function getArticles(): Promise<Article[]> {
         for (const local of localArticles) {
           const idx = inMemoryArticles.findIndex((m) => m.id === local.id);
           if (idx === -1) {
-            inMemoryArticles.push(local);
+            inMemoryArticles.push({
+              ...local,
+              views: Math.max(local.views || 0, getTotalViews(local.id)),
+            });
+          } else {
+            inMemoryArticles[idx].views = Math.max(
+              inMemoryArticles[idx].views || 0,
+              local.views || 0,
+              getTotalViews(local.id)
+            );
           }
         }
       }
@@ -227,10 +243,14 @@ export async function getArticles(): Promise<Article[]> {
       });
 
       writeArticlesToFile(inMemoryArticles);
-      return inMemoryArticles.map((a) => ({
-        ...a,
-        views: getTotalViews(a.id),
-      }));
+      return inMemoryArticles.map((a) => {
+        const statsViews = getTotalViews(a.id);
+        const finalViews = Math.max(a.views || 0, statsViews);
+        return {
+          ...a,
+          views: finalViews,
+        };
+      });
     } else if (rows && rows.length === 0) {
       const localArticles = readArticlesFromFile() || [];
       inMemoryArticles = localArticles;
@@ -437,7 +457,13 @@ export async function saveArticle(article: Article): Promise<Article> {
     console.warn('Neon save notice (article is saved locally):', error);
   }
 
-  fullArticle.views = getTotalViews(id);
+  const currentTotal = getTotalViews(id);
+  const preservedViews = Math.max(
+    article.views ?? 0,
+    currentTotal,
+    existing?.views ?? 0
+  );
+  fullArticle.views = preservedViews;
   return fullArticle;
 }
 

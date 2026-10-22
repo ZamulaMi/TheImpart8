@@ -294,7 +294,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       categoriesEn: initialCatsEn,
       topics: initialTopics,
       topicsEn: initialTopicsEn,
-      views: viewsMap[article.id] ?? article.views ?? 0,
+      views: Math.max(viewsMap[article.id] ?? 0, article.views ?? 0),
     });
   };
 
@@ -491,7 +491,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           : undefined,
       topicsEn: finalTopicsEn,
       publishedEn: isPubEn,
-      views: existing?.views ?? editingArticle.views ?? (editingArticle.id ? viewsMap[editingArticle.id] : undefined) ?? 0,
+      views: Math.max(existing?.views ?? 0, editingArticle.views ?? 0, (editingArticle.id ? viewsMap[editingArticle.id] : 0) ?? 0),
     };
 
     if (isEditor && onSaveDraft) {
